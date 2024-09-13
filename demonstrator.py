@@ -10,8 +10,9 @@ import pandas as pd
 
 if __name__ == '__main__':
     wm = False
-    format = 'portrait'
+    format = 'landscape'
     quality = 1440
+    cam = 1
 
     # setting mediapipe parameters
     med_par = []
@@ -42,7 +43,7 @@ if __name__ == '__main__':
 
         print("-----------Starting Recording---------")
 
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(cam)
         if not cap.isOpened():
             print("Cannot open camera")
             exit()
