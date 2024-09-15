@@ -10,10 +10,11 @@ import json
 # from mediapipe_plot_function import plot_from_csv
 
 if __name__ == '__main__':
+    slowing_factor = 2
     wm = False
     format = 'landscape'
-    quality = 1440
-    cam = 1
+    quality = 1080
+    cam = 0
     with open('exercise.json') as json_file:
         data = json.load(json_file)
     gt_df = pd.DataFrame(data[0]['expectation'])
@@ -63,6 +64,13 @@ if __name__ == '__main__':
                 height = int(quality/width * height)
                 width = quality  
         frame_count = 0
+        repetition_counter = 0
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        org = (10, 500)
+        fontScale = 12
+        color = (149, 17, 105)
+        text_thickness = 5
+        wait = True
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -93,16 +101,11 @@ if __name__ == '__main__':
                 # tmp = height
                 # height = width
                 # width = tmp
-            if frame_count >= 59:
-                current_expectation = gt_df.loc[frame_count%30]
-                for i in mp_pose.POSE_CONNECTIONS:
-                    start_point = tuple(np.multiply(np.array([current_expectation[i[0]]['x'],xyz_list[i[0]]['y']]), [w, h]).astype(int))
-                    end_point = tuple(np.multiply(np.array([xyz_list[i[1]]['x'],xyz_list[i[1]]['y']]), [w, h]).astype(int))
-                    thickness = int(max(min(w, h)/250,1))
-                    cv2.line(frame, start_point, end_point, (255,165,0), thickness)
-
             if (results.pose_landmarks != None and not wm):
+                base_expectation = gt_df.loc[0]
                 xyz_list = []
+                x_current_list = []
+                y_current_list = []
                 for idx, landmark in enumerate(results.pose_landmarks.landmark):
                     xyz_list.append(landmark.x)
                     xyz_list.append(landmark.y)
@@ -115,12 +118,49 @@ if __name__ == '__main__':
                     cv2.line(frame, start_point, end_point, (200, 200, 200), thickness)
                 for j in range(33):
                     drawing_coordinates = tuple(np.multiply(np.array([xyz_list[j*4+x],xyz_list[j*4+y]]), [w, h]).astype(int))
+                    x_current_list.append(drawing_coordinates[0]/w)
+                    y_current_list.append(drawing_coordinates[1]/h)
                     radius = int(max(min(w, h)/100,1))
                     blue_part = int(255*xyz_list[j*4+3])
                     green_part = int(255*(1-xyz_list[j*4+3]))
                     red_part = 0
                     cv2.circle(frame, drawing_coordinates, radius, (blue_part, green_part, red_part), -1) # green = (0, 100, 0)
+                if wait:
+                    x_expec_list = []
+                    y_expec_list = []
+                    for exp in base_expectation:
+                        x_expec_list.append(exp['x'])
+                        y_expec_list.append(exp['y'])
+                    difference = np.sqrt(np.mean((np.array(x_expec_list)-np.array(x_current_list))**2+(np.array(y_expec_list)-np.array(y_current_list))**2))
+                    if difference < 0.07:
+                        start_frame = frame_count
+                        wait=False      
+                    #     print('GO!')   
+                    # else:
+                    #     print(str(difference))
+                
+                gt_counter = 0
+                if not wait:
+                    gt_counter += 1
+                    current_expectation = gt_df.loc[int((frame_count-start_frame)/slowing_factor)%60]
+                    for i in mp_pose.POSE_CONNECTIONS:
+                        start_point = tuple(np.multiply(np.array([current_expectation[i[0]]['x'],current_expectation[i[0]]['y']]), [w, h]).astype(int))
+                        end_point = tuple(np.multiply(np.array([current_expectation[i[1]]['x'],current_expectation[i[1]]['y']]), [w, h]).astype(int))
+                        thickness = int(max(min(w, h)/250,1))
+                        cv2.line(frame, start_point, end_point, (165,0,255), thickness)
+                    if int((frame_count-start_frame)/slowing_factor)%60 == 0 and (frame_count-start_frame)/slowing_factor>1:# gt_counter >= slowing_factor*60: # int((frame_count-start_frame)/slowing_factor)%60 == 0 and (frame_count-start_frame)/slowing_factor>1:
+                        repetition_counter+=1
+                        gt_counter = 0
+                        wait = True
+                else:
+                    for i in mp_pose.POSE_CONNECTIONS:
+                        start_point = tuple(np.multiply(np.array([base_expectation[i[0]]['x'],base_expectation[i[0]]['y']]), [w, h]).astype(int))
+                        end_point = tuple(np.multiply(np.array([base_expectation[i[1]]['x'],base_expectation[i[1]]['y']]), [w, h]).astype(int))
+                        thickness = int(max(min(w, h)/250,1))
+                        cv2.line(frame, start_point, end_point, (165,0,255), thickness)
+
             frame_count += 1
+            frame = cv2.putText(frame, str(repetition_counter), org, font, fontScale, color, text_thickness, cv2.LINE_AA)
             cv2.imshow('Demonstrator',frame)
 
             if cv2.waitKey(1) == ord('q'):
