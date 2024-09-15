@@ -5,6 +5,7 @@ mp_pose = mp.solutions.pose
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import json
 
 # from mediapipe_plot_function import plot_from_csv
 
@@ -13,6 +14,9 @@ if __name__ == '__main__':
     format = 'landscape'
     quality = 1440
     cam = 1
+    with open('exercise.json') as json_file:
+        data = json.load(json_file)
+    gt_df = pd.DataFrame(data[0]['expectation'])
 
     # setting mediapipe parameters
     med_par = []
@@ -58,6 +62,7 @@ if __name__ == '__main__':
             else:
                 height = int(quality/width * height)
                 width = quality  
+        frame_count = 0
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -88,6 +93,13 @@ if __name__ == '__main__':
                 # tmp = height
                 # height = width
                 # width = tmp
+            if frame_count >= 59:
+                current_expectation = gt_df.loc[frame_count%30]
+                for i in mp_pose.POSE_CONNECTIONS:
+                    start_point = tuple(np.multiply(np.array([current_expectation[i[0]]['x'],xyz_list[i[0]]['y']]), [w, h]).astype(int))
+                    end_point = tuple(np.multiply(np.array([xyz_list[i[1]]['x'],xyz_list[i[1]]['y']]), [w, h]).astype(int))
+                    thickness = int(max(min(w, h)/250,1))
+                    cv2.line(frame, start_point, end_point, (255,165,0), thickness)
 
             if (results.pose_landmarks != None and not wm):
                 xyz_list = []
@@ -108,6 +120,7 @@ if __name__ == '__main__':
                     green_part = int(255*(1-xyz_list[j*4+3]))
                     red_part = 0
                     cv2.circle(frame, drawing_coordinates, radius, (blue_part, green_part, red_part), -1) # green = (0, 100, 0)
+            frame_count += 1
             cv2.imshow('Demonstrator',frame)
 
             if cv2.waitKey(1) == ord('q'):
